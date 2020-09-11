@@ -11,13 +11,20 @@ mixin FirebaseAuthMixin {
 	final FirebaseAuth auth = FirebaseAuth.instance;
 	
 	/// https://firebase.flutter.dev/docs/auth/social#google
-	/// google_sign_in: "^4.5.1"
-	/// GoogleSignIn();
+	/// google_sign_in: ^4.5.1
+	/// import 'package:google_sign_in/google_sign_in.dart';
+	/// googleSignIn = GoogleSignIn();
 	dynamic googleSignIn;
 	/// https://firebase.flutter.dev/docs/auth/social#facebook
-	/// flutter_facebook_auth: "^0.2.3"
-	/// 
-	dynamic facebookLogin;
+	/// flutter_facebook_auth: ^0.2.3
+	/// import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+	/// facebookLogin = FacebookAuth.instance
+	dynamic facebookSignIn;
+	/// https://firebase.flutter.dev/docs/auth/social#apple
+	/// apple_sign_in: ^0.1.0
+	/// import 'package:apple_sign_in/apple_sign_in.dart';
+	/// appleLogin = AppleSignIn();
+	dynamic appleSignIn;
 
 	/// 
 	Future<User> _signInAnonimous(BuildContext context) async {
@@ -136,7 +143,7 @@ mixin FirebaseAuthMixin {
 	Future<User> _signInWithFacebook(BuildContext context) async {
 		try {
 
-			final result = await facebookLogin.login();
+			final result = await facebookSignIn.login();
 			if (result.status == 200) {
 
 				final AuthCredential credential = FacebookAuthProvider.credential(result.accessToken.token);
@@ -160,12 +167,14 @@ mixin FirebaseAuthMixin {
 
 	/// 
 	Future<User> signInWithFacebook(BuildContext context) async {
-		return _signInWithFacebook(context).then((user) => _onLoginComplete(context, user));
+		User user = await _signInWithFacebook(context).then((user) => _onLoginComplete(context, user));
+		return _onLoginComplete(context, user);
 	}
 
 	/// 
 	Future<User> signInWithFacebookDialog(BuildContext context) async {
-		return await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithFacebook, signInWithFacebook(context)).then((user) => _onLoginComplete(context, user));
+		User user = await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithFacebook, _signInWithFacebook(context));
+		return await _onLoginComplete(context, user);
 	}
 
 	/// 
@@ -176,7 +185,7 @@ mixin FirebaseAuthMixin {
 	///
 	Future<User> _onLoginComplete(BuildContext context, User user) async {
 		if (user != null) {
-			onLoginComplete(context, user);
+			await onLoginComplete(context, user);
 		}
 		return user;
 	}
@@ -235,7 +244,13 @@ mixin FirebaseAuthMixin {
 
 	/// 
 	Future<User> signOut(BuildContext context) async {
-		return _signOut(context).then((user) => _onSignOutComplete(context, user));
+		User user = auth.currentUser;
+		if (user == null) {
+			return null;
+		}
+
+		user = await _signOut(context).then((user) => _onSignOutComplete(context, user));
+		return _onSignOutComplete(context, user);
 	}
 
 	/// 
@@ -245,9 +260,10 @@ mixin FirebaseAuthMixin {
 			return null;
 		}
 
-		return await showAwaitDialog<User>(context, message: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.loggingOut]), function: (context, updateMessage) async {
+		user = await showAwaitDialog<User>(context, message: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.loggingOut]), function: (context, updateMessage) async {
 			return _signOut(context);
-		}).then((user) => _onSignOutComplete(context, user));
+		});
+		return _onSignOutComplete(context, user);
 	}
 
 	/// 
