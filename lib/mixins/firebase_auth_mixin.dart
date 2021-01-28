@@ -6,6 +6,11 @@ import 'package:useful_firebase/useful_firebase.dart';
 
 /// https://firebase.flutter.dev/docs/auth/overview
 mixin FirebaseAuthMixin {
+
+	User _lastLoggedInUser;
+
+	/// 
+	bool automaticDeleteAnonymousUser = true;
 	
 	///
 	final FirebaseAuth auth = FirebaseAuth.instance;
@@ -26,15 +31,39 @@ mixin FirebaseAuthMixin {
 	/// appleLogin = AppleSignIn();
 	dynamic appleSignIn;
 
+	///
+	Future<UserCredential> _processSignIn(BuildContext context, Future<UserCredential> Function() futureSignIn) async {
+		bool anonymousUserHasBeenDeleted = false;
+		try {
+
+			if (automaticDeleteAnonymousUser && (auth.currentUser?.isAnonymous ?? false)) {
+				anonymousUserHasBeenDeleted = true;
+				auth.currentUser.delete();
+			}
+
+			UserCredential userCredential = await futureSignIn();
+			_lastLoggedInUser = userCredential.user;
+
+			return userCredential;
+			
+		} catch (error) {
+			if (anonymousUserHasBeenDeleted) {
+				await _signInAnonimous(context);
+			}
+			rethrow;
+		}
+	}
+
 	/// 
 	Future<User> _signInAnonimous(BuildContext context) async {
 		try {
 
-			UserCredential userCredential = await auth.signInAnonymously();
+			UserCredential userCredential = await _processSignIn(context, () => auth.signInAnonymously());
 			User user = userCredential?.user;
 			
 			if (user != null) {
-				return (await onLoginRetriveUser(context, user) ? user : null);
+				await onLoginRetriveUser(context, _lastLoggedInUser, user);
+				return user;
 			}
 
 		} catch (error) {
@@ -62,13 +91,14 @@ mixin FirebaseAuthMixin {
 			_checkEmailInformed(context, email);
 			_checkPasswordInformed(context, password);
 
-			UserCredential userCredential = await auth.signInWithEmailAndPassword(
+			UserCredential userCredential = await _processSignIn(context, () => auth.signInWithEmailAndPassword(
 				email: email, 
-				password: password);
+				password: password));
 			User user = userCredential?.user;
 
 			if (user != null) {
-				return (await onLoginRetriveUser(context, user) ? user : null);
+				await onLoginRetriveUser(context, _lastLoggedInUser, user);
+				return user;
 			}
 
 		} catch (error) {
@@ -111,11 +141,12 @@ mixin FirebaseAuthMixin {
 
 				if (authCredential != null) {
 
-					UserCredential userCredential = await auth.signInWithCredential(authCredential);
+					UserCredential userCredential = await _processSignIn(context, () => auth.signInWithCredential(authCredential));
 					User user = userCredential?.user;
 
 					if (user != null) {
-						return (await onLoginRetriveUser(context, user) ? user : null);
+						await onLoginRetriveUser(context, _lastLoggedInUser, user);
+						return user;
 					}
 
 				}
@@ -148,11 +179,12 @@ mixin FirebaseAuthMixin {
 
 				final AuthCredential credential = FacebookAuthProvider.credential(result.accessToken.token);
 				
-				UserCredential userCredential = await auth.signInWithCredential(credential);
+				UserCredential userCredential = await _processSignIn(context, () => auth.signInWithCredential(credential));
 				User user = userCredential?.user;
 				
 				if (user != null) {
-					return (await onLoginRetriveUser(context, user) ? user : null);
+					await onLoginRetriveUser(context, _lastLoggedInUser, user);
+					return user;
 				}
 
 			}
@@ -178,9 +210,8 @@ mixin FirebaseAuthMixin {
 	}
 
 	/// 
-	Future<bool> onLoginRetriveUser(BuildContext context, User user) async {
-		return true;
-	}
+	@mustCallSuper
+	Future<void> onLoginRetriveUser(BuildContext context, User previousUser, User user) async {}
 
 	///
 	Future<User> _onLoginComplete(BuildContext context, User user) async {
@@ -229,10 +260,9 @@ mixin FirebaseAuthMixin {
 
 		try {
 			
-			if (await onSignOut(context, user)) {
-				await auth.signOut();
-				return user;
-			}
+			await auth.signOut();
+			await onSignOut(context, user);
+			return user;
 		
 		} catch (error) {
 			if (!await processFirebaseAuthErrors(context, error)) {
@@ -267,8 +297,9 @@ mixin FirebaseAuthMixin {
 	}
 
 	/// 
-	Future<bool> onSignOut(BuildContext context, User user) async {
-		return true;
+	@mustCallSuper
+	Future<void> onSignOut(BuildContext context, User user) async {
+		_lastLoggedInUser = null;
 	}
 
 	/// 
