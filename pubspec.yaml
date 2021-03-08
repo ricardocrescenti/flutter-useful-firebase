@@ -21,12 +21,12 @@ dependencies:
     #   ref: master
   simple_localization: ^1.0.0
   
-  firebase_core: ^0.5.0
-  firebase_auth: ^0.18.0
-  firebase_storage: ^4.0.0
-  firebase_messaging: ^7.0.0
+  firebase_core: ^1.0.0
+  firebase_auth: ^1.0.0
+  firebase_storage: ^8.0.0
+  firebase_messaging: ^9.0.0
   
-  localstorage: ^3.0.1+4
+  localstorage: ^3.0.2+5
 
 dev_dependencies:
   flutter_test:

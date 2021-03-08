@@ -7,8 +7,8 @@ abstract class FirebaseStorageMixin {
   FirebaseStorage _storage;
   FirebaseStorage get storage => _storage;
 
-  StorageReference _storageRef;
-  StorageReference get storageRef => _storageRef;
+  Reference _storageRef;
+  Reference get storageRef => _storageRef;
 
   LocalStorage _localStorage;
 
@@ -16,7 +16,7 @@ abstract class FirebaseStorageMixin {
     final auth = FirebaseAuth.instance;
     final options = await auth.app.options;
     final storageBucket = (!options.storageBucket.startsWith('gs://') ? 'gs://' : '') + options.storageBucket;
-    _storage = FirebaseStorage(app: auth.app, storageBucket: storageBucket);
+    _storage = FirebaseStorage.instanceFor(app: auth.app, bucket: storageBucket);
     _storageRef = _storage.ref();
   }
 
