@@ -1,4 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:standard_dialogs/standard_dialogs.dart';
@@ -7,7 +8,7 @@ import 'package:useful_firebase/useful_firebase.dart';
 /// https://firebase.flutter.dev/docs/auth/overview
 mixin FirebaseAuthMixin {
 
-	User _lastLoggedInUser;
+	User? _lastLoggedInUser;
 
 	/// 
 	bool automaticDeleteAnonymousUser = true;
@@ -38,7 +39,7 @@ mixin FirebaseAuthMixin {
 
 			if (automaticDeleteAnonymousUser && (auth.currentUser?.isAnonymous ?? false)) {
 				anonymousUserHasBeenDeleted = true;
-				auth.currentUser.delete();
+				auth.currentUser!.delete();
 			}
 
 			UserCredential userCredential = await futureSignIn();
@@ -55,37 +56,46 @@ mixin FirebaseAuthMixin {
 	}
 
 	/// 
-	Future<User> _signInAnonimous(BuildContext context) async {
+	Future<User?> _signInAnonimous(BuildContext context) async {
+
 		try {
 
-			UserCredential userCredential = await _processSignIn(context, () => auth.signInAnonymously());
-			User user = userCredential?.user;
-			
-			if (user != null) {
-				await onLoginRetriveUser(context, _lastLoggedInUser, user);
-				return user;
-			}
+			return _processSignIn(context, () => auth.signInAnonymously())
+				.then<User?>((UserCredential userCredential) async {
+
+					User? user = userCredential.user;
+					
+					if (user != null) {
+						await onLoginRetriveUser(context, _lastLoggedInUser, user);
+					}
+
+					return user;
+
+				});
 
 		} catch (error) {
 			if (!await processFirebaseAuthErrors(context, error)) {
 				rethrow;
 			}
 		}
+
 		return null;
+
 	}
 
 	/// 
-	Future<User> signInAnonimous(BuildContext context) async {
+	Future<User?> signInAnonimous(BuildContext context) async {
 		return _signInAnonimous(context).then((user) => _onLoginComplete(context, user));
 	}
 
 	/// 
-	Future<User> signInAnonimousDialog(BuildContext context) async {
+	Future<User?> signInAnonimousDialog(BuildContext context) async {
 		return await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithGoogle, _signInAnonimous(context)).then((user) => _onLoginComplete(context, user));
 	}
 
 	/// 
-	Future<User> _signInWithEmailAndPassword(BuildContext context, String email, String password) async {
+	Future<User?> _signInWithEmailAndPassword(BuildContext context, String email, String password) async {
+
 		try {
 
 			_checkEmailInformed(context, email);
@@ -94,7 +104,7 @@ mixin FirebaseAuthMixin {
 			UserCredential userCredential = await _processSignIn(context, () => auth.signInWithEmailAndPassword(
 				email: email, 
 				password: password));
-			User user = userCredential?.user;
+			User? user = userCredential.user;
 
 			if (user != null) {
 				await onLoginRetriveUser(context, _lastLoggedInUser, user);
@@ -106,24 +116,33 @@ mixin FirebaseAuthMixin {
 				rethrow;
 			}
 		}
+
 		return null;
+
 	}
 
 	/// 
-	Future<User> signInWithEmailAndPassword(BuildContext context, String email, String password) async {
-		return _signInWithEmailAndPassword(context, email, password).then((user) => _onLoginComplete(context, user));
+	Future<User?> signInWithEmailAndPassword(BuildContext context, String email, String password) async {
+		
+		return _signInWithEmailAndPassword(context, email, password)
+			.then((user) => _onLoginComplete(context, user));
+
 	}
 
 	/// 
-	Future<User> signInWithEmailAndPasswordDialog(BuildContext context, String email, String password) async {
+	Future<User?> signInWithEmailAndPasswordDialog(BuildContext context, String email, String password) async {
+
 		_checkEmailInformed(context, email);
 		_checkPasswordInformed(context, password);
 
-		return await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithGoogle, _signInWithEmailAndPassword(context, email, password)).then((user) => _onLoginComplete(context, user));
+		return _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithGoogle, _signInWithEmailAndPassword(context, email, password))
+			.then((user) => _onLoginComplete(context, user));
+
 	}
 
 	/// 
-	Future<User> _signInWithGoogle(BuildContext context) async {
+	Future<User?> _signInWithGoogle(BuildContext context) async {
+
 		try {
 		
 			if (googleSignIn == null) {
@@ -139,49 +158,9 @@ mixin FirebaseAuthMixin {
 					idToken: googleAuthentication.idToken,
 				);
 
-				if (authCredential != null) {
+				UserCredential userCredential = await _processSignIn(context, () => auth.signInWithCredential(authCredential));
+				User? user = userCredential.user;
 
-					UserCredential userCredential = await _processSignIn(context, () => auth.signInWithCredential(authCredential));
-					User user = userCredential?.user;
-
-					if (user != null) {
-						await onLoginRetriveUser(context, _lastLoggedInUser, user);
-						return user;
-					}
-
-				}
-			}
-
-		} catch (error) {
-			if (!await processFirebaseAuthErrors(context, error)) {
-				rethrow;
-			}
-		}
-		return null;
-	}
-
-	/// 
-	Future<User> signInWithGoogle(BuildContext context) async {
-		return _signInWithGoogle(context).then((user) => _onLoginComplete(context, user));
-	}
-
-	/// 
-	Future<User> signInWithGoogleDialog(BuildContext context) async {
-		return await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithGoogle, _signInWithGoogle(context)).then((user) => _onLoginComplete(context, user));
-	}
-
-	/// 
-	Future<User> _signInWithFacebook(BuildContext context) async {
-		try {
-
-			final result = await facebookSignIn.login();
-			if (result.status == 200) {
-
-				final AuthCredential credential = FacebookAuthProvider.credential(result.accessToken.token);
-				
-				UserCredential userCredential = await _processSignIn(context, () => auth.signInWithCredential(credential));
-				User user = userCredential?.user;
-				
 				if (user != null) {
 					await onLoginRetriveUser(context, _lastLoggedInUser, user);
 					return user;
@@ -194,44 +173,101 @@ mixin FirebaseAuthMixin {
 				rethrow;
 			}
 		}
+
 		return null;
+
 	}
 
 	/// 
-	Future<User> signInWithFacebook(BuildContext context) async {
-		User user = await _signInWithFacebook(context).then((user) => _onLoginComplete(context, user));
-		return _onLoginComplete(context, user);
+	Future<User?> signInWithGoogle(BuildContext context) async {
+
+		return await _signInWithGoogle(context)
+			.then((user) => _onLoginComplete(context, user));
+
 	}
 
 	/// 
-	Future<User> signInWithFacebookDialog(BuildContext context) async {
-		User user = await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithFacebook, _signInWithFacebook(context));
-		return await _onLoginComplete(context, user);
+	Future<User?> signInWithGoogleDialog(BuildContext context) async {
+		
+		return await _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithGoogle, _signInWithGoogle(context))
+			.then((user) => _onLoginComplete(context, user));
+
+	}
+
+	/// 
+	Future<User?> _signInWithFacebook(BuildContext context) async {
+
+		try {
+
+			final result = await facebookSignIn.login();
+			if (result.status == 200) {
+
+				final AuthCredential credential = FacebookAuthProvider.credential(result.accessToken.token);
+				
+				return _processSignIn(context, () => auth.signInWithCredential(credential))
+					.then((UserCredential userCredential) async {
+
+						User? user = userCredential.user;
+
+						if (user != null) {
+							await onLoginRetriveUser(context, _lastLoggedInUser, user);
+							return user;
+						}
+
+						return null;
+
+					});
+			}
+
+		} catch (error) {
+			if (!await processFirebaseAuthErrors(context, error)) {
+				rethrow;
+			}
+		}
+
+		return null;
+
+	}
+
+	/// 
+	Future<User?> signInWithFacebook(BuildContext context) async {
+		
+		return _signInWithFacebook(context)
+			.then((user) => _onLoginComplete(context, user));
+
+	}
+
+	/// 
+	Future<User?> signInWithFacebookDialog(BuildContext context) async {
+		
+		return _showLoginDialog(context, UsefulFirebaseStringsEnum.loggingInWithFacebook, _signInWithFacebook(context))
+			.then((user) => _onLoginComplete(context, user));
+
 	}
 
 	/// 
 	@mustCallSuper
-	Future<void> onLoginRetriveUser(BuildContext context, User previousUser, User user) async {}
+	Future<void> onLoginRetriveUser(BuildContext context, User? previousUser, User? user) async {}
 
 	///
-	Future<User> _onLoginComplete(BuildContext context, User user) async {
+	Future<User?> _onLoginComplete(BuildContext context, User? user) async {
+
 		if (user != null) {
 			await onLoginComplete(context, user);
 		}
 		return user;
+
 	}
 
 	/// 
-	Future<void> onLoginComplete(BuildContext context, User user) async {
-		return true;
-	}
+	Future<void> onLoginComplete(BuildContext context, User? user) async {}
 
 	/// 
 	Future<void> sendPasswordResetEmail(BuildContext context, String email) async {
+
 		try {
 
 			_checkEmailInformed(context, email);
-
 			return auth.sendPasswordResetEmail(email: email);
 
 		} catch (error) {
@@ -239,20 +275,24 @@ mixin FirebaseAuthMixin {
 				rethrow;
 			}
 		}
+
 	}
 
 	/// 
 	Future<void> sendPasswordResetEmailDialog(BuildContext context, String email) async {
+
 		_checkEmailInformed(context, email);
 
 		return await showAwaitDialog<void>(context, message: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.sendingRecoverPassword]), function: (context, updateMessage) async {
 			await sendPasswordResetEmail(context, email);		
 		});
+	
 	}
 
 	/// 
-	Future<User> _signOut(BuildContext context) async {
-		User user = auth.currentUser;
+	Future<User?> _signOut(BuildContext context) async {
+
+		User? user = auth.currentUser;
 
 		if (user == null) {
 			return null;
@@ -269,31 +309,38 @@ mixin FirebaseAuthMixin {
 				rethrow;
 			}
 		}
+
 		return null;
+
 	}
 
 	/// 
-	Future<User> signOut(BuildContext context) async {
-		User user = auth.currentUser;
+	Future<User?> signOut(BuildContext context) async {
+
+		User? user = auth.currentUser;
 		if (user == null) {
 			return null;
 		}
 
-		user = await _signOut(context).then((user) => _onSignOutComplete(context, user));
+		user = await _signOut(context);
 		return _onSignOutComplete(context, user);
+
 	}
 
 	/// 
-	Future<User> signOutDialog(BuildContext context) async {
-		User user = auth.currentUser;
+	Future<User?> signOutDialog(BuildContext context) async {
+
+		User? user = auth.currentUser;
 		if (user == null) {
 			return null;
 		}
 
-		user = await showAwaitDialog<User>(context, message: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.loggingOut]), function: (context, updateMessage) async {
+		user = await showAwaitDialog<User?>(context, message: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.loggingOut]), function: (context, updateMessage) async {
 			return _signOut(context);
 		});
+
 		return _onSignOutComplete(context, user);
+
 	}
 
 	/// 
@@ -303,61 +350,69 @@ mixin FirebaseAuthMixin {
 	}
 
 	/// 
-	Future<User> _onSignOutComplete(BuildContext context, User user) async {
+	Future<User?> _onSignOutComplete(BuildContext context, User? user) async {
+
 		if (user != null) {
 			await onSignOutComplete(context, user);
 		}
 		return user;
+
 	}
 
 	///
 	Future<void> onSignOutComplete(BuildContext context, User user) async {}
 
 	/// 
-	_checkEmailInformed(BuildContext context, String email) {
+	_checkEmailInformed(BuildContext context, String? email) {
+
 		if ((email ?? '').isEmpty) {
 			throw PlatformException(code: 'NO_EMAIL_INFORMED');
 		}
+
 	}
 	
 	/// 
-	_checkPasswordInformed(BuildContext context, String password) {
+	_checkPasswordInformed(BuildContext context, String? password) {
+
 		if ((password ?? '').isEmpty) {
 			throw PlatformException(code: 'NO_PASSWORD_INFORMED');
 		}
+
 	}
 
 	/// 
-	Future<User> _showLoginDialog(BuildContext context, UsefulFirebaseStringsEnum localizationString, Future<User> login) async {
-		return await showAwaitDialog<User>(context, message: Text(UsefulFirebaseLocalizations.of(context)[localizationString]), function: (context, updateMessage) async {
+	Future<User?> _showLoginDialog(BuildContext context, UsefulFirebaseStringsEnum localizationString, Future<User?> login) async {
+
+		return await showAwaitDialog<User?>(context, message: Text(UsefulFirebaseLocalizations.of(context)[localizationString]), function: (context, updateMessage) async {
 			
-			User user = await login;
+			User? user = await login;
 			return user;
 		
 		});
+
 	}
 
 	///
 	Future<bool> processFirebaseAuthErrors(BuildContext context, dynamic error) async {
+
 		switch (error.code) {
 			
 			case 'wrong-password':
 			case 'ERROR_WRONG_PASSWORD': 
 				await showBasicDialog(context, title: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.wrongPassword]));
 				return true;
-			break;
 			
 			case 'NO_EMAIL_INFORMED': 
 				await showBasicDialog(context, title: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.noEmailInformed]));
 				return true;
-			break;
 			
 			case 'NO_PASSWORD_INFORMED': 
 				await showBasicDialog(context, title: Text(UsefulFirebaseLocalizations.of(context)[UsefulFirebaseStringsEnum.noPasswordInformed]));
 				return true;
-			break;
 
 		}
+
 		return false;
+
 	}
 }
